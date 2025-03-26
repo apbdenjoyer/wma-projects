@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment (if it’s in the root directory)
+venv/
+.env/
+
+# PyCharm IDE files
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
