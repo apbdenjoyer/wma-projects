@@ -1,9 +1,25 @@
-import sys
-
-import cv2
 import numpy as np
 import os
+import cv2
 import tkinter as tk
+
+
+def nothing(x):
+    pass
+
+
+def resize_image_to_screen_size(src, divider):
+    root = tk.Tk()
+    root.withdraw()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    h, w = src.shape[:2]
+    if w > h:
+        return cv2.resize(src, (int(screen_width / divider), int(screen_width * h / (w * divider))),
+                          interpolation=cv2.INTER_LINEAR)
+    else:
+        return cv2.resize(src, (int(screen_height * w / (h * divider)), int(screen_height / divider)),
+                          interpolation=cv2.INTER_LINEAR)
 
 
 def shift_hue_of_image(src, degrees):
@@ -21,378 +37,235 @@ def morph_image_mask(src, erosion_steps, dilation_steps):
 
 def create_mask_from_color(src, lower, upper):
     hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
-    lower_color = np.array([lower, 50, 50])
+    lower_color = np.array([lower, 0, 0])
     upper_color = np.array([upper, 255, 255])
     return cv2.inRange(hsv, lower_color, upper_color)
 
 
-def nothing(x):
-    pass
-
-
 def merge_images(images):
-    # Ensure all images are in the same 3-channel format (BGR) for concatenation
     for i, img in enumerate(images):
         if img.ndim != 3:
             images[i] = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    return resize_image_to_screen_size(cv2.hconcat(images), 1.5)
 
-    # Concatenate all images horizontally in a single row
-    full = cv2.hconcat(images)
-
-    return full
 
 def load_image(path, image_name):
-    image_path = os.path.join(path, image_name)
-    return cv2.imread(image_path)
+    return cv2.imread(os.path.join(path, image_name))
 
 
-#
-# def norm_size():
-#     global image
-#     h, w = image.shape[:2]
-#     if h > w:
-#         if h > 800:
-#             s = (1 - (800 / h)) * (-1)
-#             w = w + int(w * (s))
-#             h = h + int(h * (s))
-#             image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
-#     else:
-#         if w > 800:
-#             s = (1 - (800 / w)) * (-1)
-#             w = w + int(w * (s))
-#             h = h + int(h * (s))
-#             image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
-#     cv2.imshow('obrazek', image)
-#
-#
-# # key e
-# def hsv_range():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     # Convert the HSV colorspace
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     # Threshold the HSV image to get only blue color
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     cv2.imshow('obrazek', mask)
-#
-#
-# # key r
-# def hsv_bitwise():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     # Bitwise-AND mask and original image
-#     res = cv2.bitwise_and(index, index, mask=mask)
-#     cv2.imshow('obrazek', res)
-#
-#
-# # key t
-# def hsv_median():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     res = cv2.bitwise_and(index, index, mask=mask)
-#     res = cv2.medianBlur(res, ksize=ksize)
-#     cv2.imshow('obrazek', res)
-#
-#
-# # key f
-# def morphology():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     kernel = np.ones((ksize, ksize), np.uint8)
-#     mask_without_noise = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-#     cv2.imshow('obrazek', mask_without_noise)
-#
-#
-# # key g
-# def morphology2():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     kernel = np.ones((ksize, ksize), np.uint8)
-#     # mask_without_noise = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))
-#     mask_closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-#     cv2.imshow('obrazek', mask_closed)
-#
-#
-# # key h
-# def marker():
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#     contours, hierarchy = cv2.findContours(mask, 1, 2)
-#     print(contours)
-#     M = cv2.moments(contours[0])
-#     cx = int(M['m10'] / M['m00'])
-#     cy = int(M['m01'] / M['m00'])
-#     image_marker = index.copy()
-#     cv2.drawMarker(image_marker, (int(cx), int(cy)), color=(
-#         0, 255, 0), markerType=cv2.MARKER_CROSS, thickness=2)
-#     cv2.imshow('obrazek', image_marker)
-#
-#
-# # key p
-# def connect_mask():
-#     # Pobierz wartości z suwaków (trackbarów) dla dolnego i górnego zakresu koloru oraz rozmiaru maski
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-#
-#     # Konwersja obrazu na przestrzeń kolorów HSV
-#     hsv_frame = cv2.cvtColor(index, cv2.COLOR_BGR2HSV)
-#
-#     # Utworzenie maski dla pierwszego zakresu kolorów
-#     lower = np.array([low_color, 100, 100])
-#     upper = np.array([high_color, 255, 255])
-#     mask = cv2.inRange(hsv_frame, lower, upper)
-#
-#     # Nałożenie maski na obraz i wyświetlenie wyniku
-#     res = cv2.bitwise_and(index, index, mask=mask)
-#     cv2.imshow('mask 1', res)
-#
-#     # Utworzenie maski dla drugiego zakresu kolorów
-#     lower = np.array([0, 100, 100])
-#     upper = np.array([ksize, 255, 255])
-#     mask2 = cv2.inRange(hsv_frame, lower, upper)
-#
-#     # Nałożenie drugiej maski na obraz i wyświetlenie wyniku
-#     res = cv2.bitwise_and(index, index, mask=mask2)
-#     cv2.imshow('mask 2', res)
-#
-#     # Połączenie dwóch masek za pomocą operacji bitowej OR
-#     b_mask = cv2.bitwise_or(mask, mask2)
-#
-#     # Nałożenie połączonej maski na obraz i wyświetlenie wyniku
-#     res = cv2.bitwise_and(index, index, mask=b_mask)
-#     cv2.imshow('obrazek', res)
-#
-#
-# # key j
-# def find_circle():
-#     # Pobierz wartości z suwaków (trackbarów) dla dolnego i górnego zakresu koloru oraz rozmiaru maski
-#     low_color = cv2.getTrackbarPos('low', 'obrazek')
-#     high_color = cv2.getTrackbarPos('high', 'obrazek')
-#     ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-#
-#     # Utwórz kopię obrazu, aby nie modyfikować oryginału
-#     c_img = index.copy()
-#
-#     # Konwersja obrazu na skalę szarości
-#     gimg = cv2.cvtColor(c_img, cv2.COLOR_RGB2GRAY)
-#
-#     # Zastosowanie rozmycia na obrazie w skali szarości
-#     bimg = cv2.blur(gimg, (ksize, ksize))
-#
-#     # Wykrywanie okręgów za pomocą transformacji Hougha
-#     circles = cv2.HoughCircles(bimg, cv2.HOUGH_GRADIENT, high_color, low_color)
-#     print(circles)  # Wyświetlenie wykrytych okręgów (surowe dane)
-#
-#     # Zaokrąglenie współrzędnych wykrytych okręgów do liczb całkowitych
-#     circles = np.uint16(np.around(circles))
-#     print(circles)  # Wyświetlenie zaokrąglonych współrzędnych okręgów
-#
-#     # Iteracja po wykrytych okręgach i rysowanie ich na obrazie
-#     for i in circles[0, :]:
-#         # Rysowanie okręgu na obrazie (środek: (i[0], i[1]), promień: i[2])
-#         cv2.circle(c_img, (i[0], i[1]), i[2], (0, 255, 0), 2)
-#
-#     # Wyświetlenie obrazu z narysowanymi okręgami
-#     cv2.imshow('obrazek', c_img)
-#
+def detect_circles(blurred):
+    equalized = cv2.equalizeHist(blurred)
+    circles = cv2.HoughCircles(equalized, cv2.HOUGH_GRADIENT, dp=1.2, minDist=40, param1=100, param2=30, minRadius=20,
+                               maxRadius=60)
 
-# key k
-def line():
-    global image
-    # Pobierz wartości progów dolnego i górnego z trackbarów
-    low_color = cv2.getTrackbarPos('low', 'obrazek')
-    high_color = cv2.getTrackbarPos('high', 'obrazek')
+    if circles is not None:
+        return np.uint16(np.around(circles[0]))
 
-    # Konwersja obrazu na skalę szarości
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return []
 
-    # Wykrywanie krawędzi za pomocą algorytmu Canny'ego
-    edges = cv2.Canny(gray, low_color, high_color, apertureSize=3)
 
-    # Wykrywanie linii za pomocą transformacji Hougha
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 90,
-                            minLineLength=100, maxLineGap=5)
+def classify_coins(circles, mask, avg_radius):
+    coins = {0: [], 1: []}  # 0 = 5gr, 1 = 5zł
+    for (x, y, r) in circles:
+        c_mask = np.zeros_like(mask, dtype=np.uint8)
 
-    # Utworzenie kopii obrazu, aby narysować linie
-    image_l = image.copy()
+        # black mask with white circle
+        cv2.circle(c_mask, (x, y), r, 255, -1)
 
-    # Iteracja po wykrytych liniach i rysowanie ich na obrazie
+        # check overlap, if smaller than 0.5, assume circle is fake
+        overlap = cv2.bitwise_and(mask, mask, mask=c_mask)
+        total_area = np.count_nonzero(c_mask)
+        white_in_mask = np.count_nonzero(overlap)
+        ratio = white_in_mask / total_area if total_area > 0 else 0
+        if ratio > 0.5:
+            if r <= avg_radius:
+                coins[0].append((x, y, r))
+            else:
+                coins[1].append((x, y, r))
+    return coins
+
+
+def draw_coins(image, coins):
+    five_gr_color = (255, 0, 0)
+    five_zl_color = (0, 0, 255)
+    for (x, y, r) in coins[0]:
+        cv2.circle(image, (x, y), r, five_gr_color, 3)
+    for (x, y, r) in coins[1]:
+        cv2.circle(image, (x, y), r, five_zl_color, 3)
+    return image, coins
+
+
+def find_circles(src, blurred, mask):
+    circles = detect_circles(blurred)
+    if not circles.any():
+        return src.copy()
+
+    avg_r = np.mean([c[2] for c in circles])
+    print(f"average radius: {avg_r:.2f}")
+
+    coins = classify_coins(circles, mask, avg_r)
+
+    return draw_coins(src.copy(), coins)
+
+
+# if their coordinates are similar, keep only one
+def are_lines_similar(line1, line2, threshold=5):
+    x11, y11, x12, y12 = line1
+    x21, y21, x22, y22 = line2
+
+    dist1 = np.hypot(x11 - x21, y11 - y21)
+    dist2 = np.hypot(x12 - x22, y12 - y22)
+
+    return dist1 < threshold and dist2 < threshold
+
+
+def get_polygon(lines):
+    vertices = []
     for line in lines:
-        x1, y1, x2, y2 = line[0]
-        cv2.line(image_l, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        x1, y1, x2, y2 = line
+        vertices.append((x1, y1))
+        vertices.append((x2, y2))
 
-    # Wyświetlenie obrazu z narysowanymi liniami
-    cv2.imshow("obrazek", image_l)
+    hull = cv2.convexHull(np.array(vertices))
+
+    return hull
 
 
-# key o
-def rotate():
-    global image
-    # Pobierz wartość kąta obrotu z trackbara o nazwie 'low'
-    rot = cv2.getTrackbarPos('low', 'obrazek')
+def find_lines(src, lower, upper):
+    gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, lower, upper, apertureSize=3)
+    lines = cv2.HoughLinesP(
+        edges,
+        1,
+        np.pi / 180,
+        100,
+        minLineLength=150,
+        maxLineGap=150)
 
-    # Pobierz wymiary obrazu
-    height, width = image.shape[:2]
+    image_l = src.copy()
 
-    # Oblicz środek obrazu
-    center_x, center_y = (width / 2, height / 2)
+    filtered_lines = []
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
 
-    # Utwórz macierz transformacji dla obrotu obrazu
-    M = cv2.getRotationMatrix2D((center_x, center_y), rot, 1.0)
+            too_close = any(are_lines_similar((x1, y1, x2, y2), l, threshold=250) for l in filtered_lines)
 
-    # Zastosuj macierz transformacji, aby obrócić obraz
-    rotated_image = cv2.warpAffine(image, M, (width, height))
+            if not too_close:
+                filtered_lines.append((x1, y1, x2, y2))
+                cv2.line(image_l, (x1, y1), (x2, y2), (127, 127, 127), 3)
 
-    # Wyświetl obrócony obraz w oknie o nazwie 'obrazek'
-    cv2.imshow('obrazek', rotated_image)
+    polygon = get_polygon(filtered_lines)
+
+    if polygon.size > 0:
+        cv2.polylines(image_l, [polygon], isClosed=True, color=(0, 255, 0), thickness=5)
+        return image_l, polygon
+
+    return image_l, None
 
 
 images = []
-path_to_images = r'..\mp2\data'
-image = None
-fun = None
-
-
-def change_h(x):
-    global fun
-    if fun is not None:
-        fun()
-
-
-def find_circle():
-    # Pobierz wartości z suwaków (trackbarów) dla dolnego i górnego zakresu koloru oraz rozmiaru maski
-    low_color = cv2.getTrackbarPos('low', 'obrazek')
-    high_color = cv2.getTrackbarPos('high', 'obrazek')
-    ksize = cv2.getTrackbarPos('ksize', 'obrazek')
-
-    # Utwórz kopię obrazu, aby nie modyfikować oryginału
-    image_with_circles = image.copy()
-
-    # Konwersja obrazu na skalę szarości
-    gimg = cv2.cvtColor(image_with_circles, cv2.COLOR_RGB2GRAY)
-
-    # Zastosowanie rozmycia na obrazie w skali szarości
-    bimg = cv2.blur(gimg, (ksize, ksize))
-
-    # Wykrywanie okręgów za pomocą transformacji Hougha
-    circles = cv2.HoughCircles(bimg, cv2.HOUGH_GRADIENT, high_color, low_color)
-    print(circles)  # Wyświetlenie wykrytych okręgów (surowe dane)
-
-    if circles is not None:
-        # Zaokrąglenie współrzędnych wykrytych okręgów do liczb całkowitych
-        circles = np.uint16(np.around(circles))
-        print(circles)  # Wyświetlenie zaokrąglonych współrzędnych okręgów
-
-        # Iteracja po wykrytych okręgach i rysowanie ich na obrazie
-        for i in circles[0, :]:
-            # Rysowanie okręgu na obrazie (środek: (i[0], i[1]), promień: i[2])
-            cv2.circle(image_with_circles, (i[0], i[1]), i[2], (0, 255, 0), 2)
-
-    return image_with_circles
-
-
+path_to_images = 'data'
 window_name = 'obrazek'
+
 
 def get_image(index):
     return images[index % len(images)]
 
+
+def calculate(coins, src, polygon):
+    print('='*60)
+    poly_mask = np.zeros_like(src, dtype=np.uint8)
+    cv2.fillPoly(poly_mask, [polygon], (255, 255, 255))
+
+    poly_area = np.count_nonzero(poly_mask)
+    print(f"Total area of the tray: {poly_area:.0f}")
+
+    # 0 -> outside, 1 -> inside
+    coins_in_tray = {0: [], 1: []}
+
+    for i, label in zip(range(len(coins)), ['5 groszy', '5 zlotych']):
+        print(f"\nDenomination: {label}, Count: {len(coins[i])}")
+        area_sum = 0
+        for (x, y, r) in coins[i]:
+            c_area = np.pi * r ** 2
+            area_sum += c_area
+            if cv2.pointPolygonTest(polygon, (x, y), False) < 0:
+                coins_in_tray[0].append(i)  # Outside tray
+            else:
+                coins_in_tray[1].append(i)  # Inside tray
+
+        if i == 1:
+            print(f"\tTotal area for {label}: {area_sum:.0f} ({(area_sum / poly_area) * 100:.2f}% of the tray area)")
+        else:
+            print(f"\tTotal area for {label}: {area_sum:.0f}")
+
+    for i, coins_list in coins_in_tray.items():
+        five_gr_coins = sum(c == 0 for c in coins_list)
+        five_zl_coins = sum(c == 1 for c in coins_list)
+
+        if i == 0:
+            print(f"\nValue outside the tray: {five_zl_coins * 5} zlotych, {five_gr_coins * 5} groszy.")
+        else:
+            print(f"\nValue inside the tray: {five_zl_coins * 5} zlotych, {five_gr_coins * 5} groszy.")
+
+
 def main():
-    global window_name, images
+    global images
 
-    files = os.listdir(path_to_images)
-    for i in range(len(files)):
-        image_name, extension = os.path.splitext(files[i])
-
-        if extension.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']:
-            image = load_image(path_to_images, files[i])
-            images.append(image)
+    files = [f for f in os.listdir(path_to_images) if os.path.splitext(f)[1].lower() in ['.jpg', '.jpeg', '.png']]
+    images = [load_image(path_to_images, f) for f in sorted(files)]
 
     cv2.namedWindow(window_name)
 
     cv2.createTrackbar("hue shift", window_name, 0, 180, nothing)
-    cv2.createTrackbar("mask lower", window_name, 0, 180, nothing)
-    cv2.createTrackbar("mask upper", window_name, 0, 180, nothing)
-    cv2.createTrackbar("blur size", window_name, 0, 25, nothing)
-    cv2.createTrackbar("erosion iters", window_name, 0, 25, nothing)
-    cv2.createTrackbar("dilation iters", window_name, 0, 25, nothing)
+    cv2.createTrackbar("coins lower", window_name, 0, 180, nothing)
+    cv2.createTrackbar("coins upper", window_name, 0, 180, nothing)
+    cv2.createTrackbar("blur size", window_name, 1, 25, nothing)
+    cv2.createTrackbar("lines lower", window_name, 0, 180, nothing)
+    cv2.createTrackbar("lines upper", window_name, 0, 180, nothing)
 
-    previous_values = (-1, -1, -1, -1, -1, -1)
-
+    previous_values = (-1,) * 6
     index = 0
     image = images[index]
+
     while True:
         hue = cv2.getTrackbarPos("hue shift", window_name)
-        lower = cv2.getTrackbarPos("mask lower", window_name)
-        upper = cv2.getTrackbarPos("mask upper", window_name)
+        coins_lower = cv2.getTrackbarPos("coins lower", window_name)
+        coins_upper = cv2.getTrackbarPos("coins upper", window_name)
         blur = cv2.getTrackbarPos("blur size", window_name)
-        erosion = cv2.getTrackbarPos("erosion iters", window_name)
-        dilation = cv2.getTrackbarPos("dilation iters", window_name)
+        lines_lower = cv2.getTrackbarPos("lines lower", window_name)
+        lines_upper = cv2.getTrackbarPos("lines upper", window_name)
 
-        current_values = (hue, lower, upper, blur, erosion, dilation)
-
+        current_values = (hue, coins_lower, coins_upper, blur, lines_lower, lines_upper)
         if current_values != previous_values:
-            hue_shifted_img = shift_hue_of_image(image, hue)
-            mask = create_mask_from_color(hue_shifted_img, lower, upper)
-            morphed = morph_image_mask(mask, erosion, dilation)
 
-            group = [hue_shifted_img, morphed, hue_shifted_img, morphed]
+            if blur % 2 == 0:
+                blur += 1
 
-            merged = merge_images(group)
+            hue_shifted = shift_hue_of_image(image, hue)
+            gray_blurred = cv2.GaussianBlur(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), (blur, blur), 0)
+            mask = create_mask_from_color(hue_shifted, coins_lower, coins_upper)
 
-            height, width = merged.shape[:2]
-            window_width = width + 100  # Add some space for trackbars
-            window_height = height + 200  # Add some space for trackbars
+            with_lines, polygon = find_lines(image, lines_lower, lines_upper)
+            with_lines_and_coins, coins = find_circles(with_lines, gray_blurred, mask)
 
-            # Resize the window
-            cv2.resizeWindow(window_name, window_width, window_height)
+            if polygon is not None:
+                calculate(coins, image, polygon)
 
-            cv2.imshow(window_name,merged)
+            merged = merge_images([hue_shifted, mask, with_lines_and_coins])
+            cv2.imshow(window_name, merged)
 
-            previous_values=current_values
-
+            previous_values = current_values
         key = cv2.waitKey(1)
-        # -----------wybor obrazka----------------
-        if key == ord(','):  # go left [<]
-            index+=1
+        if key == ord(','):
+            index += 1
             image = get_image(index)
+            previous_values = (-1,) * 6
         elif key == ord('.'):
             index -= 1
             image = get_image(index)
-        elif key == ord('j'):
-            try:
-                find_circle()
-                fun = find_circle
-            except Exception as e:
-                continue
-
+            previous_values = (-1,) * 6
         elif key == 27:
             cv2.destroyAllWindows()
             break
