@@ -96,24 +96,29 @@ def track_object_in_image(filepath):
     cv2.createTrackbar("hue shift", window_name, 0, 180, nothing)
     cv2.createTrackbar("mask lower", window_name, 0, 180, nothing)
     cv2.createTrackbar("mask upper", window_name, 0, 180, nothing)
+    cv2.createTrackbar("blur size", window_name, 0, 25, nothing)
     cv2.createTrackbar("erosion iters", window_name, 0, 25, nothing)
     cv2.createTrackbar("dilation iters", window_name, 0, 25, nothing)
 
-    previous_values = (-1, -1, -1, -1, -1)
+    previous_values = (-1, -1, -1, -1, -1, -1)
 
     while True:
         hue = cv2.getTrackbarPos("hue shift", window_name)
         lower = cv2.getTrackbarPos("mask lower", window_name)
         upper = cv2.getTrackbarPos("mask upper", window_name)
+        blur = cv2.getTrackbarPos("blur size", window_name)
         erosion = cv2.getTrackbarPos("erosion iters", window_name)
         dilation = cv2.getTrackbarPos("dilation iters", window_name)
 
-        current_values = (hue, lower, upper, erosion, dilation)
+        current_values = (hue, lower, upper, blur, erosion, dilation)
 
         if current_values != previous_values:
             hue_shifted_img = shift_hue_of_image(image, hue)
             mask = create_mask_from_color(hue_shifted_img, lower, upper)
             morphed = morph_image_mask(mask, erosion, dilation)
+
+
+
             marked = add_marker(image, morphed)
             bitwise = cv2.bitwise_and(marked, marked, mask=morphed)
             images = [hue_shifted_img, mask, morphed, bitwise]
@@ -162,7 +167,7 @@ def track_object_in_video(filepath):
     cv2.createTrackbar("erosion iters", window_name, 0, 25, nothing)
     cv2.createTrackbar("start processing", window_name, 0, 1, nothing)
 
-    previous_values = (-1,-1, -1, -1, -1, -1)
+    previous_values = (-1, -1, -1, -1, -1, -1)
 
     success, image = capture.read()
 
