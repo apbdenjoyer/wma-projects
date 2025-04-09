@@ -215,8 +215,9 @@ def main():
 
     files = [f for f in os.listdir(path_to_images) if os.path.splitext(f)[1].lower() in ['.jpg', '.jpeg', '.png']]
     images = [load_image(path_to_images, f) for f in sorted(files)]
-
-    cv2.namedWindow(window_name)
+    
+    # i love opencv on windows 🙃
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     cv2.createTrackbar("hue shift", window_name, 0, 180, nothing)
     cv2.createTrackbar("coins lower", window_name, 0, 180, nothing)
