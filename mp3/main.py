@@ -22,20 +22,34 @@ def resize_image_to_screen_size(src, divider):
                           interpolation=cv2.INTER_LINEAR)
 
 
-def shift_hue_of_image(src, degrees):
+def norm_size(src):
+    h, w = src.shape[:2]
+    if h > w:
+        if h > 800:
+            s = (1 - (800 / h)) * (-1)
+            w = w + int(w * (s))
+            h = h + int(h * (s))
+            normed = cv2.resize(src, (w, h), interpolation=cv2.INTER_LINEAR)
+    else:
+        if w > 800:
+            s = (1 - (800 / w)) * (-1)
+            w = w + int(w * (s))
+            h = h + int(h * (s))
+            normed = cv2.resize(src, (w, h), interpolation=cv2.INTER_LINEAR)
+    return normed
+
+
+def shift_hue_of_image(src):
+    global window_name
+    hue = cv2.getTrackbarPos("hue shift", window_name)
+
     hsv_image = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
-    hsv_image[:, :, 0] = (hsv_image[:, :, 0] + degrees) % 180
+    hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 180
     return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
 
 
-def morph_image_mask(src, erosion_steps, dilation_steps):
-    kernel = np.ones((5, 5))
-    dilated = cv2.dilate(src, kernel, iterations=dilation_steps)
-    eroded = cv2.erode(dilated, kernel, iterations=erosion_steps)
-    return eroded
-
-
 def create_mask_from_color(src, lower, upper):
+    global window_name
     hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
     lower_color = np.array([lower, 0, 0])
     upper_color = np.array([upper, 255, 255])
@@ -56,226 +70,234 @@ def load_image(path, image_name, scale=0.5):
     return img
 
 
-
-def detect_circles(blurred):
-    equalized = cv2.equalizeHist(blurred)
-    circles = cv2.HoughCircles(equalized, cv2.HOUGH_GRADIENT, dp=1.2, minDist=40, param1=100, param2=30, minRadius=20,
-                               maxRadius=60)
-
-    if circles is not None:
-        return np.uint16(np.around(circles[0]))
-
-    return []
-
-
-def classify_coins(circles, mask, avg_radius):
-    coins = {0: [], 1: []}  # 0 = 5gr, 1 = 5zł
-    for (x, y, r) in circles:
-        c_mask = np.zeros_like(mask, dtype=np.uint8)
-
-        # black mask with white circle
-        cv2.circle(c_mask, (x, y), r, 255, -1)
-
-        # check overlap, if smaller than 0.5, assume circle is fake
-        overlap = cv2.bitwise_and(mask, mask, mask=c_mask)
-        total_area = np.count_nonzero(c_mask)
-        white_in_mask = np.count_nonzero(overlap)
-        ratio = white_in_mask / total_area if total_area > 0 else 0
-        if ratio > 0.5:
-            if r <= avg_radius:
-                coins[0].append((x, y, r))
-            else:
-                coins[1].append((x, y, r))
-    return coins
-
-
-def draw_coins(image, coins):
-    five_gr_color = (255, 0, 0)
-    five_zl_color = (0, 0, 255)
-    for (x, y, r) in coins[0]:
-        cv2.circle(image, (x, y), r, five_gr_color, 3)
-    for (x, y, r) in coins[1]:
-        cv2.circle(image, (x, y), r, five_zl_color, 3)
-    return image, coins
-
-
-def find_circles(src, blurred, mask):
-    circles = detect_circles(blurred)
-    if not circles.any():
-        return src.copy()
-
-    avg_r = np.mean([c[2] for c in circles])
-    print(f"average radius: {avg_r:.2f}")
-
-    coins = classify_coins(circles, mask, avg_r)
-
-    return draw_coins(src.copy(), coins)
-
-
-# if their coordinates are similar, keep only one
-def are_lines_similar(line1, line2, threshold=5):
-    x11, y11, x12, y12 = line1
-    x21, y21, x22, y22 = line2
-
-    dist1 = np.hypot(x11 - x21, y11 - y21)
-    dist2 = np.hypot(x12 - x22, y12 - y22)
-
-    return dist1 < threshold and dist2 < threshold
-
-
-def get_polygon(lines):
-    vertices = []
-    for line in lines:
-        x1, y1, x2, y2 = line
-        vertices.append((x1, y1))
-        vertices.append((x2, y2))
-
-    hull = cv2.convexHull(np.array(vertices))
-
-    return hull
-
-
-def find_lines(src, lower, upper):
-    gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, lower, upper, apertureSize=3)
-    lines = cv2.HoughLinesP(
-        edges,
-        1,
-        np.pi / 180,
-        100,
-        minLineLength=150,
-        maxLineGap=150)
-
-    image_l = src.copy()
-
-    filtered_lines = []
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-
-            too_close = any(are_lines_similar((x1, y1, x2, y2), l, threshold=250) for l in filtered_lines)
-
-            if not too_close:
-                filtered_lines.append((x1, y1, x2, y2))
-                cv2.line(image_l, (x1, y1), (x2, y2), (127, 127, 127), 3)
-
-    polygon = get_polygon(filtered_lines)
-
-    if polygon.size > 0:
-        cv2.polylines(image_l, [polygon], isClosed=True, color=(0, 255, 0), thickness=5)
-        return image_l, polygon
-
-    return image_l, None
-
-
-images = []
-path_to_images = 'data'
-window_name = 'obrazek'
-
-
 def get_image(index):
-    return images[index % len(images)]
+    keys = sorted(images.keys())
+    return images[keys[index % len(keys)]]
 
 
-def calculate(coins, src, polygon):
-    print('='*60)
-    poly_mask = np.zeros_like(src, dtype=np.uint8)
-    cv2.fillPoly(poly_mask, [polygon], (255, 255, 255))
 
-    poly_area = np.count_nonzero(poly_mask)
-    print(f"Total area of the tray: {poly_area:.0f}")
+def cut(src):
+    x = cv2.getTrackbarPos('bound lower', window_name) * 2
+    y = cv2.getTrackbarPos('bound upper', window_name) * 2
+    ksize = cv2.getTrackbarPos('k size', window_name) * 2
 
-    # 0 -> outside, 1 -> inside
-    coins_in_tray = {0: [], 1: []}
+    if ksize < 10:
+        ksize = 10
 
-    for i, label in zip(range(len(coins)), ['5 groszy', '5 zlotych']):
-        print(f"\nDenomination: {label}, Count: {len(coins[i])}")
-        area_sum = 0
-        for (x, y, r) in coins[i]:
-            c_area = np.pi * r ** 2
-            area_sum += c_area
-            if cv2.pointPolygonTest(polygon, (x, y), False) < 0:
-                coins_in_tray[0].append(i)  # Outside tray
-            else:
-                coins_in_tray[1].append(i)  # Inside tray
+    cut_img = src[x: x + int(ksize / 2), y: y + ksize]
+    return cut_img
 
-        if i == 1:
-            print(f"\tTotal area for {label}: {area_sum:.0f} ({(area_sum / poly_area) * 100:.2f}% of the tray area)")
-        else:
-            print(f"\tTotal area for {label}: {area_sum:.0f}")
 
-    for i, coins_list in coins_in_tray.items():
-        five_gr_coins = sum(c == 0 for c in coins_list)
-        five_zl_coins = sum(c == 1 for c in coins_list)
+def get_sift_keys_for_image(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        if i == 0:
-            print(f"\nValue outside the tray: {five_zl_coins * 5} zlotych, {five_gr_coins * 5} groszy.")
-        else:
-            print(f"\nValue inside the tray: {five_zl_coins * 5} zlotych, {five_gr_coins * 5} groszy.")
+    low = cv2.getTrackbarPos('bound lower', window_name)
+    high = cv2.getTrackbarPos('bound upper', window_name)
+    ksize = cv2.getTrackbarPos("k size", window_name)
+    if ksize % 2 == 0:
+        ksize += 1
+
+    blur = cv2.medianBlur(gray, ksize=ksize)
+    mask = create_mask_from_color(img, low, high)
+
+    sift = cv2.SIFT_create()
+
+    keypoints, descriptors = sift.detectAndCompute(blur, mask)
+
+    return keypoints, descriptors
+
+def get_orb_keys_for_image(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    low = cv2.getTrackbarPos('bound lower', window_name)
+    high = cv2.getTrackbarPos('bound upper', window_name)
+    ksize = cv2.getTrackbarPos("k size", window_name)
+
+    if ksize % 2 == 0:
+        ksize += 1
+
+    blur = cv2.medianBlur(gray, ksize=ksize)
+    mask = create_mask_from_color(img, low, high)
+
+    orb = cv2.ORB_create()
+
+    keypoints, descriptors = orb.detectAndCompute(blur, mask)
+
+    return keypoints, descriptors
+
+
+'''
+    perform sift match between img1 (source image) and img2 (video frame)
+        >map[image] - sift matches to frame
+        >pick image with the highest match count
+        >generate new frame with matches shown
+'''
+def sift_match(frame):
+    global images, images_k_d
+
+    frame_keypoints, frame_descriptors = get_sift_keys_for_image(frame)
+
+    images_matches = {}
+
+    matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=True)
+
+    for fname, (keypoints, descriptors) in images_k_d.items():
+        matches = matcher.match(descriptors, frame_descriptors)
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        print(f"\t{fname}: {len(matches)} matches")
+
+        images_matches[fname] = (matches, keypoints)
+
+    best_fname = max(images_matches, key=lambda fname: len(images_matches[fname][0]))
+    best_matches, best_keypoints = images_matches[best_fname]
+
+    best_image = images[best_fname]
+
+    matched_img = cv2.drawMatches(
+        best_image, best_keypoints, frame, frame_keypoints, best_matches, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+    )
+
+    return matched_img
+
+def orb_match(frame):
+    global images, images_k_d
+
+    orb = cv2.ORB_create()
+
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame_keypoints, frame_descriptors = orb.detectAndCompute(frame_gray, None)
+
+    images_matches = {}
+
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+    for fname, (keypoints, descriptors) in images_k_d.items():
+        matches = matcher.match(descriptors, frame_descriptors)
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        print(f"\t{fname}: {len(matches)} matches")
+
+        images_matches[fname] = (matches, keypoints)
+
+    best_fname = max(images_matches, key=lambda fname: len(images_matches[fname][0]))
+    best_matches, best_keypoints = images_matches[best_fname]
+
+    best_image = images[best_fname]
+
+    matched_img = cv2.drawMatches(
+        best_image, best_keypoints, frame, frame_keypoints, best_matches, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+    )
+
+    return matched_img
+
+
+def compute_k_d_for_images():
+    global images_k_d
+    for fname, img in images.items():
+        keypoints, descriptors = get_sift_keys_for_image(img)
+        images_k_d[fname] = (keypoints, descriptors)
+
+
+
+images = {}
+path_to_images = 'data/img'
+path_to_video = 'data/video'
+window_name = 'wma mp3'
+images_k_d = {}
+matched_frames = []
 
 
 def main():
     global images
 
-    files = [f for f in os.listdir(path_to_images) if os.path.splitext(f)[1].lower() in ['.jpg', '.jpeg', '.png']]
-    images = [load_image(path_to_images, f) for f in sorted(files)]
-    images = [img for img in images if img is not None]
+    feature_type='sift'     #or 'orb'
 
-    # i love opencv on windows 🙃
+
+    files = [f for f in os.listdir(path_to_images) if os.path.splitext(f)[1].lower() in ['.jpg', '.jpeg', '.png']]
+    images = {f: load_image(path_to_images, f) for f in sorted(files)}
+    images = {f: img for f, img in images.items() if img is not None}
+
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     cv2.createTrackbar("hue shift", window_name, 0, 180, nothing)
-    cv2.createTrackbar("coins lower", window_name, 0, 180, nothing)
-    cv2.createTrackbar("coins upper", window_name, 0, 180, nothing)
-    cv2.createTrackbar("blur size", window_name, 1, 25, nothing)
-    cv2.createTrackbar("lines lower", window_name, 0, 180, nothing)
-    cv2.createTrackbar("lines upper", window_name, 0, 180, nothing)
+    cv2.createTrackbar("bound lower", window_name, 0, 180, nothing)
+    cv2.createTrackbar("bound upper", window_name, 0, 180, nothing)
+    cv2.createTrackbar("k size", window_name, 1, 50, nothing)
+    cv2.createTrackbar("start", window_name, 0, 1, nothing)
 
-    previous_values = (-1,) * 6
     index = 0
-    image = images[index]
+    image = get_image(index)
+
+    vid_path = os.path.join(path_to_video, 'video_10s.mp4')
+
+    cap = cv2.VideoCapture(vid_path)
+    cv2.namedWindow(window_name)
 
     while True:
-        hue = cv2.getTrackbarPos("hue shift", window_name)
-        coins_lower = cv2.getTrackbarPos("coins lower", window_name)
-        coins_upper = cv2.getTrackbarPos("coins upper", window_name)
-        blur = cv2.getTrackbarPos("blur size", window_name)
-        lines_lower = cv2.getTrackbarPos("lines lower", window_name)
-        lines_upper = cv2.getTrackbarPos("lines upper", window_name)
+        start = cv2.getTrackbarPos("start", window_name)
 
-        current_values = (hue, coins_lower, coins_upper, blur, lines_lower, lines_upper)
-        if current_values != previous_values:
+        if start == 1:
+            compute_k_d_for_images()
+            print(f"Processing video using {feature_type.upper()}...")
 
-            if blur % 2 == 0:
-                blur += 1
+            matched_frames.clear()
 
-            hue_shifted = shift_hue_of_image(image, hue)
-            gray_blurred = cv2.GaussianBlur(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), (blur, blur), 0)
-            mask = create_mask_from_color(hue_shifted, coins_lower, coins_upper)
+            src_name = os.path.basename(vid_path).split(".")[0]
 
-            with_lines, polygon = find_lines(image, lines_lower, lines_upper)
-            with_lines_and_coins, coins = find_circles(with_lines, gray_blurred, mask)
 
-            if polygon is not None:
-                calculate(coins, image, polygon)
+            match_function = sift_match if feature_type == "sift" else orb_match
 
-            merged = merge_images([hue_shifted, mask, with_lines_and_coins])
-            cv2.imshow(window_name, merged)
+            count = 0
+            while cap.isOpened():
+                ret, frame = cap.read()
 
-            previous_values = current_values
+                if not ret:
+                    break
+
+                print(f"Frame {count}:")
+                matched_img = match_function(frame)
+                matched_img_resized = norm_size(matched_img)
+                matched_frames.append(matched_img_resized)
+                count += 1
+
+            cap.release()
+            cap = cv2.VideoCapture(vid_path)
+            print(f"Video {src_name} processed!")
+
+            for frame in matched_frames:
+                cv2.imshow("Video with matching", frame)
+                if cv2.waitKey(30) == 27:
+                    break
+
+            cv2.setTrackbarPos("start", window_name, 0)
+
+        hue_shifted = shift_hue_of_image(image)
+
+        low = cv2.getTrackbarPos('bound lower', window_name)
+        high = cv2.getTrackbarPos('bound upper', window_name)
+        ksize = cv2.getTrackbarPos("k size", window_name)
+        if ksize % 2 == 0:
+            ksize += 1
+
+        blur = cv2.medianBlur(hue_shifted, ksize=ksize)
+        mask = create_mask_from_color(blur, low, high)
+
+
+        merged = merge_images([blur, mask])
+
+        cv2.imshow(window_name, merged)
+
         key = cv2.waitKey(1)
         if key == ord(','):
             index += 1
             image = get_image(index)
-            previous_values = (-1,) * 6
         elif key == ord('.'):
             index -= 1
             image = get_image(index)
-            previous_values = (-1,) * 6
         elif key == 27:
             cv2.destroyAllWindows()
             break
-
 
 if __name__ == '__main__':
     main()
